@@ -100,7 +100,9 @@
         <div class="section-title">🌡️ BME280 Sensor</div>
         <div class="grid">
             <div class="status-card">
-                <i class="fas fa-temperature-low status-icon"></i>Air Temp: <span id="temp" class="status-value">--</span> °C
+                <i class="fas fa-temperature-low status-icon"></i>Air Temp:
+                <span id="temp-c" class="status-value" style="color:#3498db">--</span> °C |
+                <span id="temp-f" class="status-value" style="color:#e74c3c">--</span> °F
                 <canvas id="tempChart"></canvas>
             </div>
             <div class="status-card">
@@ -124,11 +126,46 @@
     </div>
 
     <script>
-        let tempChart, pressureChart, humidityChart, phChart;
-        let tempData = [], pressureData = [], humidityData = [], phData = [];
+        let tempChart;
+        let pressureChart;
+        let humidityChart;
+        let phChart;
+
+        let tempCData = [];
+        let tempFData = [];
+        let pressureData = [];
+        let humidityData = [];
+        let phData = [];
+
         const maxPoints = 20;
 
-        function createChart(ctx, label) {
+        function createDualTempChart(ctx) {
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Temp (°C)',
+                            data: [],
+                            borderColor: '#3498db',
+                            fill: false,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Temp (°F)',
+                            data: [],
+                            borderColor: '#e74c3c',
+                            fill: false,
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: { scales: { x: { display: false } } }
+            });
+        }
+
+        function createChart(ctx, label, color) {
             return new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -136,8 +173,8 @@
                     datasets: [{
                         label: label,
                         data: [],
+                        borderColor: color,
                         fill: false,
-                        borderColor: '#3498db',
                         tension: 0.1
                     }]
                 },
@@ -145,21 +182,27 @@
             });
         }
 
-        function updateChart(chart, dataArray, newVal) {
+        function updateChart(chart, dataArray, newVal, datasetIndex = 0) {
             const now = new Date().toLocaleTimeString();
             if (dataArray.length >= maxPoints) dataArray.shift();
             dataArray.push(newVal);
-            chart.data.labels = Array.from({length: dataArray.length}, (_, i) => now);
-            chart.data.datasets[0].data = dataArray;
+            chart.data.labels = Array.from({ length: dataArray.length }, (_, i) => now);
+            chart.data.datasets[datasetIndex].data = dataArray;
             chart.update();
         }
 
         function updateSensors() {
             fetch('/bme280_status').then(r => r.json()).then(data => {
-                document.getElementById('temp').textContent = data.temperature;
+                const tempC = data.temperature;
+                const tempF = (tempC * 9 / 5 + 32).toFixed(2);
+
+                document.getElementById('temp-c').textContent = tempC;
+                document.getElementById('temp-f').textContent = tempF;
                 document.getElementById('pressure').textContent = data.pressure;
                 document.getElementById('humidity').textContent = data.humidity;
-                updateChart(tempChart, tempData, data.temperature);
+
+                updateChart(tempChart, tempCData, tempC, 0);
+                updateChart(tempChart, tempFData, tempF, 1);
                 updateChart(pressureChart, pressureData, data.pressure);
                 updateChart(humidityChart, humidityData, data.humidity);
             });
@@ -176,10 +219,10 @@
         }
 
         window.onload = () => {
-            tempChart = createChart(document.getElementById('tempChart'), 'Air Temp');
-            pressureChart = createChart(document.getElementById('pressureChart'), 'Pressure');
-            humidityChart = createChart(document.getElementById('humidityChart'), 'Humidity');
-            phChart = createChart(document.getElementById('phChart'), 'pH');
+            tempChart = createDualTempChart(document.getElementById('tempChart'));
+            pressureChart = createChart(document.getElementById('pressureChart'), 'Pressure', '#9b59b6');
+            humidityChart = createChart(document.getElementById('humidityChart'), 'Humidity', '#1abc9c');
+            phChart = createChart(document.getElementById('phChart'), 'pH', '#e67e22');
             updateSensors();
             setInterval(updateSensors, 5000);
         }
