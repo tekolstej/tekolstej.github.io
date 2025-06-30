@@ -1,102 +1,190 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Hydroponics Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        h1, h2 {
             text-align: center;
-            margin-top: 40px;
+            margin-top: 20px;
+            color: #2c3e50;
         }
-        .status {
-            font-size: 1.5em;
-            margin: 20px;
+        .container {
+            max-width: 1000px;
+            margin: auto;
+            padding: 20px;
         }
+        .status-card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .status-icon {
+            font-size: 1.4em;
+            margin-right: 8px;
+        }
+        .status-value {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .alert-critical { color: red; }
         .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
             padding: 12px 24px;
+            border-radius: 5px;
             font-size: 16px;
-            margin: 10px;
+            margin-top: 10px;
             cursor: pointer;
+        }
+        .btn:hover { background-color: #2980b9; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        canvas { max-width: 100%; }
+        img {
+            display: block;
+            margin: 20px auto;
+            border-radius: 10px;
+            max-width: 100%;
+            transition: transform 0.3s ease;
+        }
+        .rotate-btn {
+            display: block;
+            margin: 0 auto;
+            margin-bottom: 20px;
         }
     </style>
 </head>
 <body>
-    <h1>Hydroponics System Dashboard</h1>
+    <div class="container">
+        <h1><i class="fas fa-leaf"></i> Hydroponics System Dashboard</h1>
 
-    <div class="status">
-        💡 Grow Light is: <strong>{{ 'ON' if light_on else 'OFF' }}</strong>
-    </div>
-    <form method="post" action="/toggle">
-        <button type="submit" class="btn">
-            {{ 'Turn Light OFF' if light_on else 'Turn Light ON' }}
-        </button>
-    </form>
+        <div class="grid">
+            <div class="status-card">
+                <div><i class="fas fa-lightbulb status-icon"></i>Grow Light: <span class="status-value">{{ 'ON' if light_on else 'OFF' }}</span></div>
+                <form method="post" action="/toggle">
+                    <button class="btn">{{ 'Turn Light OFF' if light_on else 'Turn Light ON' }}</button>
+                </form>
+            </div>
 
-    <div class="status">
-        🚰 Pump is: <strong>{{ 'ON' if pump_on else 'OFF' }}</strong>
-    </div>
-    <form method="post" action="/pump_toggle">
-        <button type="submit" class="btn">
-            {{ 'Turn Pump OFF' if pump_on else 'Turn Pump ON' }}
-        </button>
-    </form>
+            <div class="status-card">
+                <div><i class="fas fa-water status-icon"></i>Pump: <span class="status-value">{{ 'ON' if pump_on else 'OFF' }}</span></div>
+                <form method="post" action="/pump_toggle">
+                    <button class="btn">{{ 'Turn Pump OFF' if pump_on else 'Turn Pump ON' }}</button>
+                </form>
+            </div>
+        </div>
 
-    <div class="status">
-        🌊 Water Level: <strong id="water-level">{{ water_level }}</strong>
-    </div>
+        <div class="status-card">
+            <div><i class="fas fa-tint status-icon"></i>Water Level: <span id="water-level" class="status-value alert-critical">{{ water_level }}</span></div>
+        </div>
 
-    <div class="status">
-        🌡️ Air Temperature: <strong id="temp">--</strong> °C
-    </div>
-    <div class="status">
-        🌫️ Barometric Pressure: <strong id="pressure">--</strong> hPa
-    </div>
-    <div class="status">
-        💧 Humidity: <strong id="humidity">--</strong> %
-    </div>
+        <div class="grid">
+            <div class="status-card">
+                <i class="fas fa-temperature-low status-icon"></i>Air Temp: <span id="temp" class="status-value">--</span> °C
+                <canvas id="tempChart"></canvas>
+            </div>
+            <div class="status-card">
+                <i class="fas fa-gauge-high status-icon"></i>Pressure: <span id="pressure" class="status-value">--</span> hPa
+                <canvas id="pressureChart"></canvas>
+            </div>
+            <div class="status-card">
+                <i class="fas fa-droplet status-icon"></i>Humidity: <span id="humidity" class="status-value">--</span> %
+                <canvas id="humidityChart"></canvas>
+            </div>
+            <div class="status-card">
+                <i class="fas fa-vial status-icon"></i>pH: <span id="ph" class="status-value">--</span> | Voltage: <span id="ph-voltage" class="status-value">--</span> V
+                <canvas id="phChart"></canvas>
+            </div>
+        </div>
 
-    <div class="status">
-        ⚗️ pH: <strong id="ph">--</strong> | Voltage: <strong id="ph-voltage">--</strong> V
+        <h2><i class="fas fa-camera"></i> Live Camera Feed</h2>
+        <button class="btn rotate-btn" onclick="rotateCamera()">Rotate Camera</button>
+        <img src="/video_feed" id="camera-feed" width="640" height="480">
     </div>
-
-    <h2>📷 Live Camera Feed</h2>
-    <img src="/video_feed" width="640" height="480">
 
     <script>
-        function updateWaterLevel() {
-            fetch('/water_level_status')
-                .then(response => response.text())
-                .then(data => document.getElementById('water-level').textContent = data)
-                .catch(console.error);
+        let tempChart, pressureChart, humidityChart, phChart;
+        let tempData = [], pressureData = [], humidityData = [], phData = [];
+        const maxPoints = 20;
+
+        function createChart(ctx, label) {
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: label,
+                        data: [],
+                        fill: false,
+                        borderColor: '#3498db',
+                        tension: 0.1
+                    }]
+                },
+                options: { scales: { x: { display: false } } }
+            });
         }
 
-        function updateBME280() {
-            fetch('/bme280_status')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('temp').textContent = data.temperature;
-                    document.getElementById('pressure').textContent = data.pressure;
-                    document.getElementById('humidity').textContent = data.humidity;
-                })
-                .catch(console.error);
+        function rotateCamera() {
+            const img = document.getElementById('camera-feed');
+            const current = img.style.transform;
+            img.style.transform = current === 'rotate(180deg)' ? 'rotate(0deg)' : 'rotate(180deg)';
         }
 
-        function updatePH() {
-            fetch('/ph_status')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('ph').textContent = data.pH;
-                    document.getElementById('ph-voltage').textContent = data.voltage;
-                })
-                .catch(console.error);
+        function updateChart(chart, dataArray, newVal) {
+            const now = new Date().toLocaleTimeString();
+            if (dataArray.length >= maxPoints) dataArray.shift();
+            dataArray.push(newVal);
+            chart.data.labels = Array.from({length: dataArray.length}, (_, i) => now);
+            chart.data.datasets[0].data = dataArray;
+            chart.update();
         }
 
-        updateWaterLevel();
-        updateBME280();
-        updatePH();
-        setInterval(updateWaterLevel, 5000);
-        setInterval(updateBME280, 5000);
-        setInterval(updatePH, 5000);
+        function updateSensors() {
+            fetch('/bme280_status').then(r => r.json()).then(data => {
+                document.getElementById('temp').textContent = data.temperature;
+                document.getElementById('pressure').textContent = data.pressure;
+                document.getElementById('humidity').textContent = data.humidity;
+                updateChart(tempChart, tempData, data.temperature);
+                updateChart(pressureChart, pressureData, data.pressure);
+                updateChart(humidityChart, humidityData, data.humidity);
+            });
+
+            fetch('/ph_status').then(r => r.json()).then(data => {
+                document.getElementById('ph').textContent = data.pH;
+                document.getElementById('ph-voltage').textContent = data.voltage;
+                updateChart(phChart, phData, data.pH);
+            });
+
+            fetch('/water_level_status').then(r => r.text()).then(data => {
+                document.getElementById('water-level').textContent = data;
+            });
+        }
+
+        window.onload = () => {
+            tempChart = createChart(document.getElementById('tempChart'), 'Air Temp');
+            pressureChart = createChart(document.getElementById('pressureChart'), 'Pressure');
+            humidityChart = createChart(document.getElementById('humidityChart'), 'Humidity');
+            phChart = createChart(document.getElementById('phChart'), 'pH');
+            updateSensors();
+            setInterval(updateSensors, 5000);
+        }
     </script>
 </body>
 </html>
