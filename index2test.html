@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hydroponics Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 40px;
+        }
+        .status {
+            font-size: 1.5em;
+            margin: 20px;
+        }
+        .btn {
+            padding: 12px 24px;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hydroponics System Dashboard</h1>
+
+    <div class="status">
+        💡 Grow Light is: <strong>{{ 'ON' if light_on else 'OFF' }}</strong>
+    </div>
+    <form method="post" action="/toggle">
+        <button type="submit" class="btn">
+            {{ 'Turn Light OFF' if light_on else 'Turn Light ON' }}
+        </button>
+    </form>
+
+    <div class="status">
+        🚰 Pump is: <strong>{{ 'ON' if pump_on else 'OFF' }}</strong>
+    </div>
+    <form method="post" action="/pump_toggle">
+        <button type="submit" class="btn">
+            {{ 'Turn Pump OFF' if pump_on else 'Turn Pump ON' }}
+        </button>
+    </form>
+
+    <div class="status">
+        🌊 Water Level: <strong id="water-level">{{ water_level }}</strong>
+    </div>
+
+    <div class="status">
+        🌡️ Air Temperature: <strong id="temp">--</strong> °C
+    </div>
+    <div class="status">
+        🌫️ Barometric Pressure: <strong id="pressure">--</strong> hPa
+    </div>
+    <div class="status">
+        💧 Humidity: <strong id="humidity">--</strong> %
+    </div>
+
+    <div class="status">
+        ⚗️ pH: <strong id="ph">--</strong> | Voltage: <strong id="ph-voltage">--</strong> V
+    </div>
+
+    <h2>📷 Live Camera Feed</h2>
+    <img src="/video_feed" width="640" height="480">
+
+    <script>
+        function updateWaterLevel() {
+            fetch('/water_level_status')
+                .then(response => response.text())
+                .then(data => document.getElementById('water-level').textContent = data)
+                .catch(console.error);
+        }
+
+        function updateBME280() {
+            fetch('/bme280_status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('temp').textContent = data.temperature;
+                    document.getElementById('pressure').textContent = data.pressure;
+                    document.getElementById('humidity').textContent = data.humidity;
+                })
+                .catch(console.error);
+        }
+
+        function updatePH() {
+            fetch('/ph_status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('ph').textContent = data.pH;
+                    document.getElementById('ph-voltage').textContent = data.voltage;
+                })
+                .catch(console.error);
+        }
+
+        updateWaterLevel();
+        updateBME280();
+        updatePH();
+        setInterval(updateWaterLevel, 5000);
+        setInterval(updateBME280, 5000);
+        setInterval(updatePH, 5000);
+    </script>
+</body>
+</html>
