@@ -110,7 +110,9 @@
                 <canvas id="pressureChart"></canvas>
             </div>
             <div class="status-card">
-                <i class="fas fa-droplet status-icon"></i>Humidity: <span id="humidity" class="status-value">--</span> %
+                <i class="fas fa-droplet status-icon"></i>Humidity:
+                <span id="humidity" class="status-value" style="color:#3498db">--</span> % RH |
+                <span id="abs-humidity" class="status-value" style="color:#e74c3c">--</span> g/m³
                 <canvas id="humidityChart"></canvas>
             </div>
         </div>
@@ -126,34 +128,25 @@
     </div>
 
     <script>
-        let tempChart;
-        let pressureChart;
-        let humidityChart;
-        let phChart;
-
-        let tempCData = [];
-        let tempFData = [];
-        let pressureData = [];
-        let humidityData = [];
-        let phData = [];
-
+        let tempChart, pressureChart, humidityChart, phChart;
+        let tempCData = [], tempFData = [], pressureData = [], rhData = [], absHumidityData = [], phData = [];
         const maxPoints = 20;
 
-        function createDualTempChart(ctx) {
+        function createDualHumidityChart(ctx) {
             return new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: [],
                     datasets: [
                         {
-                            label: 'Temp (°C)',
+                            label: 'Relative Humidity (%)',
                             data: [],
                             borderColor: '#3498db',
                             fill: false,
                             tension: 0.1
                         },
                         {
-                            label: 'Temp (°F)',
+                            label: 'Absolute Humidity (g/m³)',
                             data: [],
                             borderColor: '#e74c3c',
                             fill: false,
@@ -186,25 +179,38 @@
             const now = new Date().toLocaleTimeString();
             if (dataArray.length >= maxPoints) dataArray.shift();
             dataArray.push(newVal);
-            chart.data.labels = Array.from({ length: dataArray.length }, (_, i) => now);
+            chart.data.labels = Array.from({ length: dataArray.length }, () => now);
             chart.data.datasets[datasetIndex].data = dataArray;
             chart.update();
+        }
+
+        function calcAbsoluteHumidity(tempC, relHumidity) {
+            const mw = 18.016;
+            const r = 8314.3;
+            const tempK = tempC + 273.15;
+            const svp = 6.112 * Math.exp((17.67 * tempC) / (tempC + 243.5));
+            const vp = svp * (relHumidity / 100);
+            return ((1000 * mw * vp) / (r * tempK)).toFixed(2);
         }
 
         function updateSensors() {
             fetch('/bme280_status').then(r => r.json()).then(data => {
                 const tempC = data.temperature;
                 const tempF = (tempC * 9 / 5 + 32).toFixed(2);
+                const rh = data.humidity;
+                const absHumidity = calcAbsoluteHumidity(tempC, rh);
 
                 document.getElementById('temp-c').textContent = tempC;
                 document.getElementById('temp-f').textContent = tempF;
                 document.getElementById('pressure').textContent = data.pressure;
-                document.getElementById('humidity').textContent = data.humidity;
+                document.getElementById('humidity').textContent = rh;
+                document.getElementById('abs-humidity').textContent = absHumidity;
 
                 updateChart(tempChart, tempCData, tempC, 0);
                 updateChart(tempChart, tempFData, tempF, 1);
                 updateChart(pressureChart, pressureData, data.pressure);
-                updateChart(humidityChart, humidityData, data.humidity);
+                updateChart(humidityChart, rhData, rh, 0);
+                updateChart(humidityChart, absHumidityData, absHumidity, 1);
             });
 
             fetch('/ph_status').then(r => r.json()).then(data => {
@@ -219,9 +225,19 @@
         }
 
         window.onload = () => {
-            tempChart = createDualTempChart(document.getElementById('tempChart'));
+            tempChart = new Chart(document.getElementById('tempChart'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Temp (°C)', data: [], borderColor: '#3498db', fill: false, tension: 0.1 },
+                        { label: 'Temp (°F)', data: [], borderColor: '#e74c3c', fill: false, tension: 0.1 }
+                    ]
+                },
+                options: { scales: { x: { display: false } } }
+            });
             pressureChart = createChart(document.getElementById('pressureChart'), 'Pressure', '#9b59b6');
-            humidityChart = createChart(document.getElementById('humidityChart'), 'Humidity', '#1abc9c');
+            humidityChart = createDualHumidityChart(document.getElementById('humidityChart'));
             phChart = createChart(document.getElementById('phChart'), 'pH', '#e67e22');
             updateSensors();
             setInterval(updateSensors, 5000);
